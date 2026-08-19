@@ -52,6 +52,9 @@ getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen-futures = "0.4"
 
 [features]
+# SVG rendering support (pulls in resvg/usvg/tiny-skia, ~1 MB of wasm).
+# Only needed for tile sources that ship SVG attribution logos (e.g. Mapbox).
+svg = ["egui_extras/svg"]
 default = []
 mvt = [
   "dep:color",
