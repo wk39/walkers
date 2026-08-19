@@ -44,6 +44,9 @@ tokio.workspace = true
 wasm-bindgen-futures.workspace = true
 
 [features]
+# SVG rendering support (pulls in resvg/usvg/tiny-skia, ~1 MB of wasm).
+# Only needed for tile sources that ship SVG attribution logos (e.g. Mapbox).
+svg = ["egui_extras/svg"]
 default = []
 mvt = [
   "dep:color",
