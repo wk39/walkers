@@ -6,6 +6,9 @@ pub use reqwest::header::HeaderValue;
 pub struct HttpOptions {
     /// Path to the directory to store the HTTP cache.
     ///
+    /// The cache is a single redb database (`http-cache.redb`) held under an exclusive lock, so
+    /// only one client at a time can use a given directory; others run without a cache.
+    ///
     /// Keep in mind that some providers (such as OpenStreetMap) require clients
     /// to respect the HTTP `Expires` header.
     /// <https://operations.osmfoundation.org/policies/tiles/>
@@ -86,25 +89,43 @@ pub(crate) use web::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod native {
     use super::{HttpOptions, bare_client};
-    use http_cache_reqwest::{CACacheManager, Cache, CacheMode, HttpCache, HttpCacheOptions};
+    use http_cache_reqwest::{Cache, CacheMode, HttpCache, HttpCacheOptions, RedbManager};
     use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
+
+    /// File name of the redb database inside `HttpOptions::cache`.
+    const CACHE_FILE: &str = "http-cache.redb";
 
     pub fn http_client(http_options: &HttpOptions) -> ClientWithMiddleware {
         let builder = ClientBuilder::new(bare_client(http_options));
 
-        if let Some(cache) = &http_options.cache {
+        if let Some(manager) = http_options.cache.as_deref().and_then(open_cache) {
             builder.with(Cache(HttpCache {
                 mode: CacheMode::Default,
-                manager: CACacheManager {
-                    path: cache.clone(),
-                    remove_opts: Default::default(),
-                },
+                manager,
                 options: HttpCacheOptions::default(),
             }))
         } else {
             builder
         }
         .build()
+    }
+
+    /// Opens (or creates) the cache database in `dir`.
+    ///
+    /// redb keeps one file under an exclusive lock, so a second client (or process) pointed at the
+    /// same directory cannot open it. That client then runs without a cache instead of failing.
+    fn open_cache(dir: &std::path::Path) -> Option<RedbManager> {
+        let file = dir.join(CACHE_FILE);
+        let opened = std::fs::create_dir_all(dir)
+            .map_err(|e| e.to_string())
+            .and_then(|()| RedbManager::new(&file).map_err(|e| e.to_string()));
+        match opened {
+            Ok(manager) => Some(manager),
+            Err(e) => {
+                log::warn!("HTTP cache disabled: cannot open {}: {e}", file.display());
+                None
+            }
+        }
     }
 }
 

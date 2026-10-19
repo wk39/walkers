@@ -46,7 +46,7 @@ getrandom = { version = "0.4.3", features = ["wasm_js"] }
 http-body-util = "0.1.4"
 # Pre-release, but it is the first version supporting `reqwest` 0.13:
 http-cache-reqwest = { version = "1.0.0-alpha.9", default-features = false, features = [
-  "manager-cacache",
+  "manager-redb",
   "reqwest-middleware",
   "url-standard",
 ] }
